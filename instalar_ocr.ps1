@@ -69,7 +69,7 @@ if ($opcion -eq "" -or $opcion -eq "A" -or $opcion -eq "a") {
     
     Write-Host ""
     Write-Host "[4/4] Verificando instalación..." -ForegroundColor Yellow
-    python -c "import easyocr; import pandas; import openpyxl; print('✓ Todas las dependencias instaladas')"
+    python -c "import easyocr; import pandas; import openpyxl; print('Todas las dependencias instaladas')"
     
     if ($LASTEXITCODE -eq 0) {
         Write-Host ""
@@ -112,7 +112,7 @@ if ($opcion -eq "" -or $opcion -eq "A" -or $opcion -eq "a") {
     
     Write-Host ""
     Write-Host "[4/4] Verificando instalación..." -ForegroundColor Yellow
-    python -c "import pytesseract; import pandas; import openpyxl; print('✓ Dependencias Python instaladas')"
+    python -c "import pytesseract; import pandas; import openpyxl; print('Dependencias Python instaladas')"
     
     if ($LASTEXITCODE -eq 0) {
         Write-Host ""
@@ -145,32 +145,32 @@ if ($opcion -eq "" -or $opcion -eq "A" -or $opcion -eq "a") {
     exit 1
 }
 
-Write-Host ""
-Write-Host "================================================================" -ForegroundColor Cyan
-Write-Host "  COMO USAR EL DETECTOR CON OCR" -ForegroundColor Cyan
-Write-Host "================================================================" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "COMANDO PRINCIPAL:" -ForegroundColor Yellow
-Write-Host "  python mi_detector_ocr.py --modo camara" -ForegroundColor White
-Write-Host ""
-Write-Host "FUNCIONALIDADES:" -ForegroundColor Yellow
-Write-Host "  ✓ Detecta dorsales automáticamente" -ForegroundColor Green
-Write-Host "  ✓ Lee el NÚMERO del dorsal con OCR" -ForegroundColor Green
-Write-Host "  ✓ Registra en Excel: Posición | Dorsal | Hora | Observaciones" -ForegroundColor Green
-Write-Host "  ✓ Evita duplicados" -ForegroundColor Green
-Write-Host ""
-Write-Host "COLORES:" -ForegroundColor Yellow
-Write-Host "  🟢 Verde  - Dorsal nuevo detectado" -ForegroundColor Green
-Write-Host "  🟠 Naranja - Dorsal ya registrado" -ForegroundColor Yellow
-Write-Host "  🔴 Rojo   - Dorsal sin número legible" -ForegroundColor Red
-Write-Host ""
-Write-Host "CONTROLES:" -ForegroundColor Yellow
+Write-Host ''
+Write-Host '================================================================' -ForegroundColor Cyan
+Write-Host '  COMO USAR EL DETECTOR CON OCR' -ForegroundColor Cyan
+Write-Host '================================================================' -ForegroundColor Cyan
+Write-Host ''
+Write-Host 'COMANDO PRINCIPAL:' -ForegroundColor Yellow
+Write-Host '  python mi_detector_ocr.py --modo camara' -ForegroundColor White
+Write-Host ''
+Write-Host 'FUNCIONALIDADES:' -ForegroundColor Yellow
+Write-Host '  Detecta dorsales automaticamente' -ForegroundColor Green
+Write-Host '  Lee el NUMERO del dorsal con OCR' -ForegroundColor Green
+Write-Host '  Registra en Excel: Posicion | Dorsal | Hora | Observaciones' -ForegroundColor Green
+Write-Host '  Evita duplicados' -ForegroundColor Green
+Write-Host ''
+Write-Host 'COLORES:' -ForegroundColor Yellow
+Write-Host '  Verde  - Dorsal nuevo detectado' -ForegroundColor Green
+Write-Host '  Naranja - Dorsal ya registrado' -ForegroundColor Yellow
+Write-Host '  Rojo   - Dorsal sin numero legible' -ForegroundColor Red
+Write-Host ''
+Write-Host 'CONTROLES:' -ForegroundColor Yellow
 Write-Host "  's' - Ver estadísticas" -ForegroundColor White
 Write-Host "  'c' - Capturar imagen" -ForegroundColor White
 Write-Host "  'ESPACIO' - Pausar/Reanudar" -ForegroundColor White
 Write-Host "  'ESC' o 'q' - Salir" -ForegroundColor White
-Write-Host ""
-Write-Host "================================================================" -ForegroundColor Cyan
-Write-Host ""
+Write-Host ''
+Write-Host '================================================================' -ForegroundColor Cyan
+Write-Host ''
 
 Read-Host 'Presiona Enter para finalizar'
