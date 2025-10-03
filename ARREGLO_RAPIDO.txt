@@ -1,0 +1,143 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                                                            ║
+║                  ⚠️  PROBLEMA: GPU NO DETECTADA ⚠️                        ║
+║                                                                            ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+DIAGNÓSTICO:
+════════════
+✅ GPU RTX 3050: FUNCIONA
+✅ Driver NVIDIA: INSTALADO
+✅ CUDA 13.0: INSTALADO
+❌ Python: NO ESTÁ EN PATH (no se puede ejecutar)
+❌ PyTorch: NO INSTALADO
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🔧 SOLUCIÓN RÁPIDA (3 PASOS):
+════════════════════════════════
+
+PASO 1: INSTALAR PYTHON
+────────────────────────
+1. Descarga Python 3.10 desde:
+   https://www.python.org/downloads/
+
+2. Ejecuta el instalador
+
+3. ✅ MUY IMPORTANTE: Marca la casilla:
+   ☑ "Add Python to PATH"
+
+4. Haz clic en "Install Now"
+
+5. Cierra y reabre PowerShell
+
+
+PASO 2: VERIFICAR PYTHON
+─────────────────────────
+En PowerShell, ejecuta:
+
+    python --version
+
+Debe mostrar: Python 3.10.x
+
+
+PASO 3: EJECUTAR INSTALADOR CORREGIDO
+──────────────────────────────────────
+En PowerShell, en la carpeta del proyecto:
+
+    .\instalar_corregido.ps1
+
+Este script:
+✓ Creará el entorno virtual
+✓ Instalará PyTorch con CUDA 12.1 (compatible con tu CUDA 13.0)
+✓ Instalará todas las dependencias
+✓ Verificará que la GPU funcione
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📝 NOTAS IMPORTANTES:
+═══════════════════════
+
+1. Tu sistema tiene CUDA 13.0, que es MÁS NUEVO que el manual sugiere
+   → El script corregido instalará PyTorch con CUDA 12.1 (compatible)
+
+2. Si el script de instalación falla, es porque Python no está en PATH
+   → Reinstala Python y MARCA "Add Python to PATH"
+
+3. Una vez que Python funcione, todo lo demás se instalará automáticamente
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🆘 SI PYTHON YA ESTÁ INSTALADO pero no funciona:
+════════════════════════════════════════════════
+
+Opción 1: Agregar Python al PATH manualmente
+─────────────────────────────────────────────
+1. Busca donde está instalado Python:
+   - Usualmente en: C:\Users\[TuUsuario]\AppData\Local\Programs\Python\Python310
+
+2. Agrega al PATH:
+   - Windows + R → escribe "sysdm.cpl" → Enter
+   - Pestaña "Opciones avanzadas"
+   - Botón "Variables de entorno"
+   - En "Variables del sistema", selecciona "Path" → "Editar"
+   - "Nuevo" y agrega:
+     C:\Users\[TuUsuario]\AppData\Local\Programs\Python\Python310
+     C:\Users\[TuUsuario]\AppData\Local\Programs\Python\Python310\Scripts
+
+3. Cierra y reabre PowerShell
+
+
+Opción 2: Reinstalar Python
+────────────────────────────
+1. Panel de Control → Programas → Desinstalar Python
+2. Descarga Python 3.10 nuevamente
+3. MARCA "Add Python to PATH" durante instalación
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ RESULTADO ESPERADO DESPUÉS DE LA INSTALACIÓN:
+════════════════════════════════════════════════
+
+    python -c "import torch; print(f'CUDA disponible: {torch.cuda.is_available()}')"
+
+Debe mostrar:
+    CUDA disponible: True
+
+Y también:
+    python -c "import torch; print(torch.cuda.get_device_name(0))"
+
+Debe mostrar:
+    NVIDIA GeForce RTX 3050 Laptop GPU
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📄 ARCHIVOS DE AYUDA CREADOS:
+═════════════════════════════
+
+✓ SOLUCION_GPU_NO_DETECTADA.md  - Guía detallada del problema
+✓ instalar_corregido.ps1         - Script de instalación actualizado
+✓ ARREGLO_RAPIDO.txt             - Este archivo
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 RESUMEN:
+══════════
+
+El problema NO es tu GPU (funciona perfectamente).
+El problema ES que Python no está instalado o no está en PATH.
+
+Una vez que Python funcione → Todo lo demás se arregla automáticamente.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+💡 CONSEJO:
+══════════
+
+Después de instalar Python correctamente, simplemente ejecuta:
+
+    .\instalar_corregido.ps1
+
+Y deja que el script haga todo automáticamente.
+
+═══════════════════════════════════════════════════════════════════════════════

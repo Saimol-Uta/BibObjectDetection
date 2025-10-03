@@ -1,0 +1,246 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                                                            ║
+║      GUÍA RÁPIDA - DETECCIÓN DE DORSALES EN PC CON NVIDIA RTX 3050       ║
+║                                                                            ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+📋 ARCHIVOS CREADOS:
+═══════════════════
+✅ INICIO_RAPIDO.md              - Guía rápida (15 minutos)
+✅ MANUAL_INSTALACION.md         - Manual completo paso a paso
+✅ README_RTX3050.md             - README optimizado para tu GPU
+✅ instalar.ps1                  - Script de instalación automática
+✅ verificar_instalacion.py      - Script de verificación del sistema
+✅ requirements.txt              - Lista de dependencias Python
+✅ ejemplo_deteccion_imagen.py   - Script de ejemplo para detección
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🚀 INSTALACIÓN RÁPIDA (4 PASOS):
+═════════════════════════════════
+
+PASO 1: Instalar Pre-requisitos
+────────────────────────────────
+□ Drivers NVIDIA RTX 3050
+  → https://www.nvidia.com/Download/index.aspx
+
+□ CUDA Toolkit 11.8 (~3 GB)
+  → https://developer.nvidia.com/cuda-11-8-0-download-archive
+
+□ cuDNN 8.6 para CUDA 11.x
+  → https://developer.nvidia.com/cudnn
+  → Requiere cuenta NVIDIA (gratis)
+  → Extraer archivos a: C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.8\
+
+□ Python 3.8, 3.9 o 3.10
+  → https://www.python.org/downloads/
+  → ✅ IMPORTANTE: Marca "Add Python to PATH" durante instalación
+
+
+PASO 2: Ejecutar Instalador Automático
+───────────────────────────────────────
+Abre PowerShell en la carpeta del proyecto y ejecuta:
+
+    Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+    .\instalar.ps1
+
+El script instalará automáticamente:
+  ✓ Entorno virtual Python
+  ✓ PyTorch con soporte CUDA
+  ✓ OpenCV con aceleración GPU
+  ✓ Todas las dependencias necesarias
+
+
+PASO 3: Verificar Instalación
+──────────────────────────────
+Ejecuta el verificador:
+
+    python verificar_instalacion.py
+
+Debe mostrar:
+  ✓ Python 3.x detectado
+  ✓ GPU NVIDIA RTX 3050 detectada
+  ✓ CUDA disponible
+  ✓ PyTorch con CUDA funcionando
+  ✓ Todos los paquetes instalados
+  ✓ Archivos del proyecto encontrados
+
+
+PASO 4: Ejecutar Demo
+─────────────────────
+    .\venv\Scripts\Activate.ps1
+    cd "notebooks+utils+data"
+    jupyter notebook
+
+En el navegador, abre:
+    05 - Bib Detection Validation & Demo.ipynb
+
+¡Y ejecuta las celdas!
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📁 NOTEBOOKS DISPONIBLES:
+═════════════════════════
+
+1. 01 - Prepocessing & Training SVHN YOLOv4-tiny Darknet.ipynb
+   → Entrenar detector de dígitos
+
+2. 02 - Digit Detection Validation Using RBNR Data.ipynb
+   → Validar detector de dígitos
+
+3. 03 - Preprocessing Racing Bib Numbers (RBNR) Datasets.ipynb
+   → Preparar dataset de dorsales
+
+4. 04 - Run Yolov4 Tiny on RBNR Data.ipynb
+   → Entrenar detector de dorsales
+
+5. 05 - Bib Detection Validation & Demo.ipynb  ⭐ RECOMENDADO
+   → Demo completo con modelos pre-entrenados
+
+═══════════════════════════════════════════════════════════════════════════════
+
+💡 COMANDOS ÚTILES:
+═══════════════════
+
+Verificar GPU:
+    nvidia-smi
+
+Verificar CUDA en Python:
+    python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}')"
+
+Activar entorno virtual:
+    .\venv\Scripts\Activate.ps1
+
+Desactivar entorno virtual:
+    deactivate
+
+Iniciar Jupyter:
+    jupyter notebook
+
+Monitorear uso de GPU:
+    nvidia-smi -l 1
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🔧 SOLUCIÓN RÁPIDA DE PROBLEMAS:
+════════════════════════════════
+
+❌ "No se puede ejecutar scripts en PowerShell"
+   → Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+❌ "nvidia-smi no encontrado"
+   → Instala drivers NVIDIA desde nvidia.com
+
+❌ "PyTorch no detecta GPU"
+   → pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+❌ "CUDA out of memory"
+   → Reduce batch size en archivos .cfg (batch=8 o batch=4)
+
+❌ "Detección muy lenta"
+   → Verifica que estés usando GPU con:
+     net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA_FP16)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📊 RENDIMIENTO ESPERADO EN RTX 3050:
+════════════════════════════════════
+
+Detección en imagen:    ~40 FPS a 416x416
+Detección en video:     ~30 FPS a 720p
+Entrenamiento:          ~15 imágenes/segundo (batch=16)
+
+Tu RTX 3050 con 8GB VRAM es perfecta para este proyecto! 🚀
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📚 DOCUMENTACIÓN DETALLADA:
+═══════════════════════════
+
+Para información completa, lee:
+  → INICIO_RAPIDO.md          (Guía de 15 minutos)
+  → MANUAL_INSTALACION.md     (Paso a paso detallado)
+  → README_RTX3050.md         (README optimizado)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ CHECKLIST DE INSTALACIÓN:
+════════════════════════════
+
+Antes de ejecutar el proyecto, verifica que hayas completado:
+
+□ Drivers NVIDIA instalados (`nvidia-smi` funciona)
+□ CUDA 11.8 instalado (`nvcc --version` funciona)
+□ cuDNN extraído en carpeta CUDA
+□ Python 3.8+ instalado (`python --version`)
+□ Ejecutado `instalar.ps1` exitosamente
+□ Ejecutado `verificar_instalacion.py` sin errores
+□ Jupyter Notebook funciona
+□ Demo notebook ejecutado correctamente
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 ¿QUÉ HACE ESTE PROYECTO?
+═══════════════════════════
+
+Este proyecto detecta automáticamente números de dorsal en:
+  ✓ Imágenes de carreras
+  ✓ Videos de maratones
+  ✓ Streams en tiempo real
+
+Usando:
+  🧠 YOLOv4-tiny (red neuronal rápida)
+  🎮 NVIDIA CUDA (aceleración GPU)
+  📷 OpenCV (procesamiento de video)
+
+Resultados:
+  ✨ 99% precisión en detección de dorsales
+  ✨ 96% precisión en detección de dígitos
+  ⚡ Procesamiento en tiempo real
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🎓 DATASETS UTILIZADOS:
+══════════════════════
+
+SVHN - Street View House Numbers
+  → http://ufldl.stanford.edu/housenumbers
+  → Para entrenamiento de dígitos
+  
+RBNR - Racing Bib Number Recognition
+  → https://people.csail.mit.edu/talidekel/RBNR.html
+  → Para entrenamiento de dorsales
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📺 RECURSOS ADICIONALES:
+═══════════════════════
+
+Video presentación:  https://youtu.be/xfVfr0KmhYY
+GitHub original:     https://github.com/Lwhieldon/BibObjectDetection
+Darknet:            https://github.com/AlexeyAB/darknet
+YOLO docs:          https://pjreddie.com/darknet/yolo/
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🚀 ¡INICIO RÁPIDO EN 3 COMANDOS!
+════════════════════════════════
+
+Una vez instalado todo:
+
+1. .\venv\Scripts\Activate.ps1
+2. cd "notebooks+utils+data"
+3. jupyter notebook
+
+Luego abre: 05 - Bib Detection Validation & Demo.ipynb
+
+═══════════════════════════════════════════════════════════════════════════════
+
+💪 ¡TODO LISTO!
+
+Si seguiste esta guía, tu PC está configurado perfectamente para detectar
+números de dorsal en imágenes y videos usando tu NVIDIA RTX 3050.
+
+¡Disfruta del proyecto! 🎉
+
+═══════════════════════════════════════════════════════════════════════════════
