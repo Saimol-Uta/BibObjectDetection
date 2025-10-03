@@ -12,9 +12,16 @@ from pathlib import Path
 import argparse
 import time
 from datetime import datetime
+import re
 
 # Importar sistema de registro
 from registro_llegadas import RegistroLlegadas
+try:
+    import pytesseract
+    _HAS_TESSERACT = True
+except Exception:
+    pytesseract = None
+    _HAS_TESSERACT = False
 
 
 class Config:
@@ -223,8 +230,13 @@ class DetectorConRegistro:
             color_bbox = Config.COLOR_BBOX
             
             if self.activar_registro and self.registro:
-                # Intentar obtener posición
-                posicion = self.registro.obtener_posicion(clase)
+                # Intentar extraer número por OCR y obtener posición real
+                numero = self.extraer_numero_por_ocr(frame, (x, y, w, h))
+                if numero is not None:
+                    posicion = self.registro.obtener_posicion(numero)
+                else:
+                    posicion = self.registro.obtener_posicion(clase)
+
                 if posicion is not None:
                     color_bbox = Config.COLOR_REGISTRADO
             
@@ -266,6 +278,63 @@ class DetectorConRegistro:
             )
         
         return frame
+
+    def extraer_numero_por_ocr(self, frame, bbox):
+        """
+        Extrae texto de la región del bbox y devuelve el primer grupo de dígitos encontrado.
+        Usa pytesseract si está disponible, si no, intenta una extracción por umbral y OCR simple
+        o devuelve None si no se encuentra.
+        """
+        x, y, w, h = bbox
+        h_frame, w_frame = frame.shape[:2]
+
+        # Asegurar coordenadas dentro del frame
+        x1 = max(0, x)
+        y1 = max(0, y)
+        x2 = min(w_frame, x + w)
+        y2 = min(h_frame, y + h)
+
+        roi = frame[y1:y2, x1:x2]
+        if roi.size == 0:
+            return None
+
+        # Convertir a gris y preprocesar
+        gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+        # Escalar para mejorar OCR
+        scale = 2
+        gray = cv2.resize(gray, (gray.shape[1]*scale, gray.shape[0]*scale), interpolation=cv2.INTER_LINEAR)
+        # Aplicar umbral adaptativo
+        gray = cv2.medianBlur(gray, 3)
+        _, th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+        text = ''
+        if _HAS_TESSERACT:
+            try:
+                # Configurar para solo dígitos
+                custom_config = r'--psm 6 digits'
+                text = pytesseract.image_to_string(th, config=custom_config)
+            except Exception:
+                text = ''
+        else:
+            # Fallback: intentar extraer dígitos usando OCR si está instalado en sistema pero no disponible como paquete
+            try:
+                # intentar llamar a pytesseract si está en PATH
+                import subprocess, shlex
+                cmd = 'tesseract stdin stdout --psm 6 -c tessedit_char_whitelist=0123456789'
+                proc = subprocess.Popen(shlex.split(cmd), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                out, _ = proc.communicate(cv2.imencode('.png', th)[1].tobytes())
+                text = out.decode('utf-8') if out else ''
+            except Exception:
+                text = ''
+
+        # Buscar primer grupo de dígitos
+        m = re.search(r"(\d{1,6})", text)
+        if m:
+            return m.group(1)
+
+        # Si no se encontró texto, intentar con técnicas simples: buscar contornos con forma de dígito
+        # (fallback ligero) - aquí devolvemos None
+        return None
 
 
 def detectar_camara(detector):
@@ -333,7 +402,10 @@ def detectar_camara(detector):
             # Registrar dorsales detectados automáticamente
             for det in detecciones:
                 dorsal = det['class_name']
-                resultado = detector.registrar_deteccion(dorsal)
+                # Intentar extraer número del bbox (OCR). Si no hay número, usar la etiqueta de clase
+                numero = detector.extraer_numero_por_ocr(frame, det['bbox'])
+                dorsal_a_registrar = numero if numero is not None else dorsal
+                resultado = detector.registrar_deteccion(dorsal_a_registrar)
                 if resultado and not resultado.get('duplicado', True):
                     registros_totales += 1
             
@@ -460,9 +532,11 @@ def detectar_imagen(detector, ruta_imagen):
         print("\n[REGISTRO] Dorsales detectados:")
         for det in detecciones:
             dorsal = det['class_name']
-            resultado = detector.registrar_deteccion(dorsal)
+            numero = detector.extraer_numero_por_ocr(frame, det['bbox'])
+            dorsal_a_registrar = numero if numero is not None else dorsal
+            resultado = detector.registrar_deteccion(dorsal_a_registrar)
             if resultado:
-                print(f"  ✓ Dorsal {dorsal} - Posición: {resultado['posicion']}")
+                print(f"  ✓ Dorsal {dorsal_a_registrar} - Posición: {resultado['posicion']}")
         print()
     
     # Dibujar
