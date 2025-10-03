@@ -33,6 +33,27 @@ if OCR_DISPONIBLE is None:
 print(f"OCR disponible: {OCR_DISPONIBLE}")
 
 
+def _check_gui_support():
+    """Comprueba si la instalación de OpenCV tiene soporte para ventanas (cv2.imshow).
+
+    Devuelve True si cv2.imshow funciona, False en instalaciones headless.
+    """
+    try:
+        # Crear una ventana temporal y mostrar una pequeña imagen
+        cv2.namedWindow("__cv_check_gui__", cv2.WINDOW_NORMAL)
+        test_img = np.zeros((2, 2, 3), dtype=np.uint8)
+        cv2.imshow("__cv_check_gui__", test_img)
+        cv2.waitKey(1)
+        cv2.destroyWindow("__cv_check_gui__")
+        return True
+    except Exception:
+        return False
+
+
+USE_GUI = _check_gui_support()
+print(f"OpenCV GUI disponible: {USE_GUI}")
+
+
 class Config:
     """Configuración del detector"""
     # Modelo RBNR
@@ -461,34 +482,58 @@ def detectar_camara(detector):
                 cv2.putText(frame, "PAUSADO", (width//2 - 100, height//2), 
                            cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 3)
         
-        # Mostrar frame
-        cv2.imshow('Detector de Dorsales con OCR', frame)
-        
-        # Manejar teclas
-        key = cv2.waitKey(1) & 0xFF
-        
-        if key == ord('q') or key == 27:  # ESC
-            break
-        elif key == ord(' '):
-            pausado = not pausado
-            print(f"{'Pausado' if pausado else 'Reanudado'}")
-        elif key == ord('c'):
-            timestamp = time.strftime("%Y%m%d_%H%M%S")
-            filename = output_dir / f"captura_{timestamp}.jpg"
-            cv2.imwrite(str(filename), frame)
-            print(f"✓ Captura guardada: {filename}")
-        elif key == ord('s'):
-            if detector.activar_registro and detector.registro:
-                stats = detector.registro.obtener_estadisticas()
-                print("\n" + "="*50)
-                print(" ESTADÍSTICAS")
-                print("="*50)
-                print(f"Total llegadas: {stats['total_llegadas']}")
-                if stats['primera_llegada']:
-                    print(f"Primera: {stats['primera_llegada']}")
-                if stats['ultima_llegada']:
-                    print(f"Última: {stats['ultima_llegada']}")
-                print("="*50 + "\n")
+        # Mostrar o salvar frame según disponibilidad GUI
+        if USE_GUI:
+            cv2.imshow('Detector de Dorsales con OCR', frame)
+            # Manejar teclas
+            key = cv2.waitKey(1) & 0xFF
+
+            if key == ord('q') or key == 27:  # ESC
+                break
+            elif key == ord(' '):
+                pausado = not pausado
+                print(f"{'Pausado' if pausado else 'Reanudado'}")
+            elif key == ord('c'):
+                timestamp = time.strftime("%Y%m%d_%H%M%S")
+                filename = output_dir / f"captura_{timestamp}.jpg"
+                cv2.imwrite(str(filename), frame)
+                print(f"✓ Captura guardada: {filename}")
+            elif key == ord('s'):
+                if detector.activar_registro and detector.registro:
+                    stats = detector.registro.obtener_estadisticas()
+                    print("\n" + "="*50)
+                    print(" ESTADÍSTICAS")
+                    print("="*50)
+                    print(f"Total llegadas: {stats['total_llegadas']}")
+                    if stats['primera_llegada']:
+                        print(f"Primera: {stats['primera_llegada']}")
+                    if stats['ultima_llegada']:
+                        print(f"Última: {stats['ultima_llegada']}")
+                    print("="*50 + "\n")
+        else:
+            # Headless: guardar frames anotados periódicamente y mostrar info en consola
+            headless_dir = output_dir / 'headless'
+            headless_dir.mkdir(exist_ok=True)
+
+            # Guardar cada N segundos para no llenar disco
+            SAVE_INTERVAL = 2.0
+            if not hasattr(detectar_camara, '_last_save'):
+                detectar_camara._last_save = 0
+
+            now = time.time()
+            if now - detectar_camara._last_save >= SAVE_INTERVAL:
+                timestamp = time.strftime("%Y%m%d_%H%M%S")
+                filename = headless_dir / f"frame_{timestamp}.jpg"
+                cv2.imwrite(str(filename), frame)
+                detectar_camara._last_save = now
+                print(f"[HEADLESS] Frame guardado: {filename} | Detectados: {len(detecciones)} | Registros: {registros_totales}")
+
+            # En modo headless no hay manejo de teclas; usar Ctrl+C para salir
+            try:
+                time.sleep(0.01)
+            except KeyboardInterrupt:
+                print('\nDetección interrumpida por usuario (Ctrl+C)')
+                break
     
     cap.release()
     cv2.destroyAllWindows()
