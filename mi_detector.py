@@ -138,16 +138,49 @@ class DetectorDorsales:
         print("\n[3/3] Configurando backend...")
         
         if self.usar_gpu:
+            # Verificar si OpenCV tiene soporte CUDA compilado
+            opencv_cuda_available = False
             try:
-                self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
-                self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA_FP16)
-                print("   ✓ Backend configurado: GPU (CUDA FP16)")
-            except Exception as e:
-                print(f"   ⚠ No se pudo usar GPU: {e}")
+                # Intentar obtener número de dispositivos CUDA
+                cuda_count = cv2.cuda.getCudaEnabledDeviceCount()
+                opencv_cuda_available = (cuda_count > 0)
+            except:
+                opencv_cuda_available = False
+            
+            if not opencv_cuda_available:
+                print("   ⚠ OpenCV no tiene soporte CUDA compilado")
+                print("   ⚠ Para usar GPU, necesitas compilar OpenCV con CUDA")
                 print("   ⚠ Usando CPU en su lugar")
                 self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
                 self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
                 self.usar_gpu = False
+                print("   ✓ Backend configurado: CPU")
+            else:
+                try:
+                    self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
+                    self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA_FP16)
+                    
+                    # Prueba rápida para verificar que funciona
+                    test_blob = cv2.dnn.blobFromImage(
+                        np.zeros((416, 416, 3), dtype=np.uint8),
+                        1/255.0,
+                        (416, 416),
+                        swapRB=True,
+                        crop=False
+                    )
+                    self.net.setInput(test_blob)
+                    layer_names = self.net.getLayerNames()
+                    output_layers = [layer_names[i - 1] for i in self.net.getUnconnectedOutLayers()]
+                    _ = self.net.forward(output_layers)
+                    
+                    print("   ✓ Backend configurado: GPU (CUDA FP16)")
+                except Exception as e:
+                    print(f"   ⚠ Error al configurar GPU: {str(e)[:100]}")
+                    print("   ⚠ Usando CPU en su lugar")
+                    self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
+                    self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
+                    self.usar_gpu = False
+                    print("   ✓ Backend configurado: CPU")
         else:
             self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
             self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
