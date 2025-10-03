@@ -1,0 +1,307 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                                                            ║
+║              📋 GUÍA DE INSTALACIÓN Y EJECUCIÓN PASO A PASO 📋            ║
+║                                                                            ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 1: INSTALACIÓN INICIAL
+═══════════════════════════════════════════════════════════════════════════════
+
+Ejecuta el instalador automático:
+
+   .\instalar_corregido.ps1
+
+   (Nota: Usa instalar_corregido.ps1 en lugar de instalar.ps1 porque está
+    actualizado para tu CUDA 13.0)
+
+¿Qué hace este script?
+  ✓ Verifica que Python esté instalado
+  ✓ Detecta tu GPU NVIDIA RTX 3050
+  ✓ Crea el entorno virtual
+  ✓ Instala PyTorch con CUDA 12.1 (compatible con tu CUDA 13.0)
+  ✓ Instala OpenCV y todas las dependencias
+  ✓ Verifica que todo funcione correctamente
+
+Tiempo estimado: 5-10 minutos (dependiendo de tu conexión)
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 2: VERIFICAR QUE TODO FUNCIONA
+═══════════════════════════════════════════════════════════════════════════════
+
+Después de la instalación, el entorno virtual YA ESTÁ ACTIVADO.
+
+Ejecuta el verificador (opcional pero recomendado):
+
+   python verificar_instalacion.py
+
+Esto te mostrará:
+  ✓ Python: versión instalada
+  ✓ GPU NVIDIA: detectada
+  ✓ CUDA: disponible en PyTorch
+  ✓ Todos los paquetes: instalados
+  ✓ Archivos del modelo: presentes
+
+Si ves TODO en verde ✅, ¡estás listo!
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 3: EJECUTAR TU DETECTOR PROPIO
+═══════════════════════════════════════════════════════════════════════════════
+
+Ahora tienes DOS opciones para ejecutar el detector:
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ OPCIÓN A: MENÚ INTERACTIVO (Más Fácil) ⭐ RECOMENDADO                     │
+└────────────────────────────────────────────────────────────────────────────┘
+
+Ejecuta:
+
+   .\iniciar_detector.ps1
+
+Se abrirá un menú con 7 opciones:
+
+   1️⃣  - Detectar con CÁMARA en tiempo real
+   2️⃣  - Detectar en IMAGEN (ejemplo incluido)
+   3️⃣  - Detectar en IMAGEN (tu propia foto)
+   4️⃣  - Detectar en VIDEO (ejemplo incluido)
+   5️⃣  - Detectar en VIDEO (tu propio video)
+   6️⃣  - Ver ayuda y opciones avanzadas
+   7️⃣  - Verificar instalación
+   0️⃣  - Salir
+
+¡Solo selecciona el número y presiona Enter!
+
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ OPCIÓN B: COMANDOS DIRECTOS (Más Control)                                 │
+└────────────────────────────────────────────────────────────────────────────┘
+
+Si el entorno virtual NO está activado, actívalo primero:
+
+   .\venv\Scripts\Activate.ps1
+
+Luego ejecuta el detector con comandos:
+
+   # Test rápido con imagen de ejemplo
+   python mi_detector.py --modo imagen --archivo "notebooks+utils+data\BibDetectorSample.jpeg"
+
+   # Cámara en tiempo real
+   python mi_detector.py --modo camara
+
+   # Video de ejemplo
+   python mi_detector.py --modo video --archivo "notebooks+utils+data\VIDEO0433.mp4"
+
+═══════════════════════════════════════════════════════════════════════════════
+RESUMEN COMPLETO DE COMANDOS
+═══════════════════════════════════════════════════════════════════════════════
+
+Aquí está TODO lo que necesitas en orden:
+
+# ──────────────────────────────────────────────────────────────────────────
+# 1. INSTALACIÓN (Solo una vez)
+# ──────────────────────────────────────────────────────────────────────────
+
+.\instalar_corregido.ps1
+
+# Espera a que termine (5-10 minutos)
+# Al finalizar, el entorno virtual está activado automáticamente
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 2. VERIFICACIÓN (Opcional)
+# ──────────────────────────────────────────────────────────────────────────
+
+python verificar_instalacion.py
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 3. EJECUTAR DETECTOR - Método Fácil (Recomendado)
+# ──────────────────────────────────────────────────────────────────────────
+
+.\iniciar_detector.ps1
+
+# Sigue el menú interactivo
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 3. EJECUTAR DETECTOR - Método Comandos
+# ──────────────────────────────────────────────────────────────────────────
+
+# Si cerraste PowerShell, activa el entorno:
+.\venv\Scripts\Activate.ps1
+
+# Test con imagen de ejemplo (RECOMENDADO PARA EMPEZAR):
+python mi_detector.py --modo imagen --archivo "notebooks+utils+data\BibDetectorSample.jpeg"
+
+# Cámara en tiempo real:
+python mi_detector.py --modo camara
+
+# Video de ejemplo:
+python mi_detector.py --modo video --archivo "notebooks+utils+data\VIDEO0433.mp4"
+
+# Tu propia imagen:
+python mi_detector.py --modo imagen --archivo "C:\ruta\a\tu\foto.jpg"
+
+# Tu propio video:
+python mi_detector.py --modo video --archivo "C:\ruta\a\tu\video.mp4"
+
+═══════════════════════════════════════════════════════════════════════════════
+EJEMPLO COMPLETO - COPIA Y PEGA ESTO
+═══════════════════════════════════════════════════════════════════════════════
+
+Aquí está la secuencia COMPLETA desde cero:
+
+# ──────────── SESIÓN 1: INSTALACIÓN (Solo la primera vez) ────────────
+
+# Paso 1: Ejecutar instalador
+.\instalar_corregido.ps1
+
+# Esperar a que termine (5-10 minutos)
+# Si todo está OK, verás: ✅ ¡INSTALACIÓN EXITOSA!
+
+# Paso 2: Verificar (opcional)
+python verificar_instalacion.py
+
+# Paso 3: Probar con imagen de ejemplo
+python mi_detector.py --modo imagen --archivo "notebooks+utils+data\BibDetectorSample.jpeg"
+
+# ¡Listo! Deberías ver la imagen con detecciones
+
+
+# ──────────── SESIONES FUTURAS: USAR EL DETECTOR ────────────
+
+# Cada vez que abras PowerShell, solo necesitas:
+
+# 1. Activar entorno
+.\venv\Scripts\Activate.ps1
+
+# 2. Usar el menú
+.\iniciar_detector.ps1
+
+# O ejecutar directamente
+python mi_detector.py --modo camara
+
+═══════════════════════════════════════════════════════════════════════════════
+¿QUÉ HACER SI...?
+═══════════════════════════════════════════════════════════════════════════════
+
+❓ El instalador dice "Python no encontrado"
+→ Instala Python 3.10 desde https://www.python.org/downloads/
+  ✅ MARCA "Add Python to PATH" durante instalación
+  Luego vuelve a ejecutar .\instalar_corregido.ps1
+
+❓ El instalador dice "CUDA disponible: False"
+→ No te preocupes, lee: SOLUCION_GPU_NO_DETECTADA.md
+  O ejecuta el detector con --cpu
+
+❓ No encuentro el archivo instalar_corregido.ps1
+→ Usa instalar.ps1 en su lugar:
+  .\instalar.ps1
+  (Puede que necesites reinstalar PyTorch con CUDA 12.1 después)
+
+❓ El comando "python" no funciona
+→ Cierra y reabre PowerShell
+  Verifica con: python --version
+  Si sigue sin funcionar, reinstala Python con "Add to PATH" marcado
+
+❓ No puedo ejecutar scripts (.ps1)
+→ Ejecuta primero:
+  Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+❓ El detector no encuentra la cámara
+→ Cierra Zoom, Teams, Skype, etc.
+  Verifica permisos de cámara en Windows
+  O usa modo imagen/video en su lugar
+
+❓ Error con archivos .weights
+→ Verifica que la carpeta weights-classes/ contenga:
+  • RBNR_custom-yolov4-tiny-detector_best.weights
+  • RBNR_custom-yolov4-tiny-detector.cfg
+  • RBRN_obj.names
+
+═══════════════════════════════════════════════════════════════════════════════
+FLUJO VISUAL COMPLETO
+═══════════════════════════════════════════════════════════════════════════════
+
+PRIMERA VEZ:
+┌─────────────────────────────────────────────────────────────────────────┐
+│                                                                         │
+│  1. .\instalar_corregido.ps1                                           │
+│     ↓                                                                   │
+│  2. Esperar 5-10 minutos                                               │
+│     ↓                                                                   │
+│  3. Ver mensaje: ✅ ¡INSTALACIÓN EXITOSA!                              │
+│     ↓                                                                   │
+│  4. python verificar_instalacion.py  (opcional)                        │
+│     ↓                                                                   │
+│  5. .\iniciar_detector.ps1   ⭐ RECOMENDADO                            │
+│     │                                                                   │
+│     └─→ Seleccionar opción 2 (imagen de ejemplo)                       │
+│         ↓                                                               │
+│         Ver resultado con detecciones! 🎉                              │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+
+PRÓXIMAS VECES:
+┌─────────────────────────────────────────────────────────────────────────┐
+│                                                                         │
+│  1. .\venv\Scripts\Activate.ps1                                        │
+│     ↓                                                                   │
+│  2. .\iniciar_detector.ps1                                             │
+│     ↓                                                                   │
+│  3. Seleccionar opción del menú                                        │
+│     ↓                                                                   │
+│  4. ¡Detectar dorsales! 🏃‍♂️                                            │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+COMANDO MÁS SIMPLE POSIBLE
+═══════════════════════════════════════════════════════════════════════════════
+
+Si solo quieres el comando más simple para empezar:
+
+PRIMERA VEZ:
+   .\instalar_corregido.ps1
+
+DESPUÉS DE LA INSTALACIÓN:
+   .\iniciar_detector.ps1
+
+¡Eso es todo! El menú te guía desde ahí.
+
+═══════════════════════════════════════════════════════════════════════════════
+ARCHIVOS DE AYUDA
+═══════════════════════════════════════════════════════════════════════════════
+
+Si necesitas más información:
+
+  📖 USO_MI_DETECTOR.md          - Guía completa del detector
+  📖 MANUAL_INSTALACION.md        - Manual de instalación detallado
+  📖 SOLUCION_GPU_NO_DETECTADA.md - Si GPU no funciona
+  📋 COMANDOS_RAPIDOS.ps1         - Todos los comandos disponibles
+  📄 LEEME_MI_DETECTOR.txt        - Resumen del detector
+  📄 RESUMEN_DETECTOR.txt         - Características completas
+
+═══════════════════════════════════════════════════════════════════════════════
+PRÓXIMOS PASOS
+═══════════════════════════════════════════════════════════════════════════════
+
+Ahora mismo, ejecuta en orden:
+
+   1. .\instalar_corregido.ps1
+
+   2. Espera a que termine (5-10 min)
+
+   3. .\iniciar_detector.ps1
+
+   4. Selecciona opción 2 (imagen de ejemplo)
+
+   5. ¡Disfruta viendo las detecciones! 🎉
+
+═══════════════════════════════════════════════════════════════════════════════
+
+¡TODO LISTO! Sigue estos pasos y en menos de 15 minutos estarás
+detectando números de dorsal en tu PC con RTX 3050. 🚀
+
+═══════════════════════════════════════════════════════════════════════════════
