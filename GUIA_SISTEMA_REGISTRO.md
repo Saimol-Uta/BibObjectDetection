@@ -247,6 +247,33 @@ for %%f in (*.jpg) do python mi_detector_registro.py --modo imagen --archivo %%f
 
 ## 🐛 SOLUCIÓN DE PROBLEMAS
 
+### ❌ **PROBLEMA: Se guarda "bib" en lugar del número del dorsal**
+
+**Causa:** El modelo RBNR detecta la región del dorsal pero NO lee el número específico.
+
+**Solución:** Usar el detector con OCR (lectura de caracteres):
+
+```powershell
+# 1. Instalar OCR
+.\instalar_ocr.ps1
+
+# 2. Usar el detector con OCR
+python mi_detector_ocr.py --modo camara
+```
+
+**¿Qué es OCR?**
+- Optical Character Recognition (Reconocimiento Óptico de Caracteres)
+- Lee los números dentro del dorsal detectado
+- Dos opciones:
+  - **EasyOCR** (recomendado): Mayor precisión, descarga ~500MB
+  - **Tesseract**: Más ligero, requiere instalación adicional
+
+**Archivos:**
+- `mi_detector_registro.py` - Detector SIN OCR (guarda "bib")
+- `mi_detector_ocr.py` - Detector CON OCR (lee el número real) ✅
+
+---
+
 ### ❌ Error: `ModuleNotFoundError: No module named 'pandas'`
 
 **Solución:**
