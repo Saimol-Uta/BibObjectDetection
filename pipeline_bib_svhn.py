@@ -169,19 +169,32 @@ def process_image(image_path, net_bib, layers_bib, names_bib, net_svhn, layers_s
                 'class_id': d['class_id']
             })
 
+        # Ordenar dígitos por coordenada x y componer el número
+        numero = ''
+        if len(digits) > 0:
+            digits_sorted = sorted(digits, key=lambda dd: dd['bbox'][0])
+            chars = []
+            for dd in digits_sorted:
+                cls = names_svhn[dd['class_id']] if dd['class_id'] < len(names_svhn) else str(dd['class_id'])
+                chars.append(cls)
+            numero = ''.join(chars)
+
         # Dibujar bbox del bib
         cv2.rectangle(img, (x1, y1), (x2, y2), Config.COLOR_BIB, 2)
-        cv2.putText(img, f"bib {det['confidence']:.2f}", (x1, y1 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.6, Config.COLOR_BIB, 2)
+        # Dibujar número compuesto arriba del bbox (si existe)
+        if numero:
+            cv2.putText(img, numero, (x1, max(16, y1 - 20)), cv2.FONT_HERSHEY_SIMPLEX, 0.9, Config.COLOR_BIB, 3)
+        else:
+            cv2.putText(img, f"bib {det['confidence']:.2f}", (x1, y1 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.6, Config.COLOR_BIB, 2)
 
-        # Dibujar dígitos detectados
+        # Dibujar dígitos detectados (opcional, mantiene los rectángulos individuales)
         for dd in digits:
             dx, dy, dw, dh = dd['bbox']
-            # obtener clase nombre
             cls = names_svhn[dd['class_id']] if dd['class_id'] < len(names_svhn) else str(dd['class_id'])
             cv2.rectangle(img, (dx, dy), (dx + dw, dy + dh), Config.COLOR_DIGIT, 2)
-            cv2.putText(img, f"{cls} {dd['confidence']:.2f}", (dx, dy - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.6, Config.COLOR_DIGIT, 2)
+            cv2.putText(img, f"{cls}", (dx, dy - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.7, Config.COLOR_DIGIT, 2)
 
-        results.append({'bib_bbox': [x1, y1, x2 - x1, y2 - y1], 'digits': digits})
+        results.append({'bib_bbox': [x1, y1, x2 - x1, y2 - y1], 'digits': digits, 'number': numero})
 
     # Guardar resultado
     output_dir = Path("output")
@@ -287,17 +300,41 @@ def main():
 
                         det_digits = detect_with_net(net_svhn, layers_svhn, roi, Config.INPUT_SIZE_SVHN, conf_svhn)
 
-                        # dibujar bib
-                        cv2.rectangle(frame, (x1, y1), (x2, y2), Config.COLOR_BIB, 2)
-                        cv2.putText(frame, f"bib {det['confidence']:.2f}", (x1, y1 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.6, Config.COLOR_BIB, 2)
-
+                        # preparar lista de dígitos absolutos
+                        digits_cam = []
                         for d in det_digits:
                             dx, dy, dw, dh = d['bbox']
                             abs_x = x1p + dx
                             abs_y = y1p + dy
-                            cls = names_svhn[d['class_id']] if d['class_id'] < len(names_svhn) else str(d['class_id'])
-                            cv2.rectangle(frame, (abs_x, abs_y), (abs_x + dw, abs_y + dh), Config.COLOR_DIGIT, 2)
-                            cv2.putText(frame, f"{cls} {d['confidence']:.2f}", (abs_x, abs_y - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.6, Config.COLOR_DIGIT, 2)
+                            digits_cam.append({
+                                'bbox': [abs_x, abs_y, dw, dh],
+                                'confidence': d['confidence'],
+                                'class_id': d['class_id']
+                            })
+
+                        # componer número ordenando por x
+                        numero_cam = ''
+                        if len(digits_cam) > 0:
+                            digits_sorted_cam = sorted(digits_cam, key=lambda dd: dd['bbox'][0])
+                            chars_cam = []
+                            for dd in digits_sorted_cam:
+                                cls = names_svhn[dd['class_id']] if dd['class_id'] < len(names_svhn) else str(dd['class_id'])
+                                chars_cam.append(cls)
+                            numero_cam = ''.join(chars_cam)
+
+                        # dibujar bib
+                        cv2.rectangle(frame, (x1, y1), (x2, y2), Config.COLOR_BIB, 2)
+                        if numero_cam:
+                            cv2.putText(frame, numero_cam, (x1, max(16, y1 - 20)), cv2.FONT_HERSHEY_SIMPLEX, 0.9, Config.COLOR_BIB, 3)
+                        else:
+                            cv2.putText(frame, f"bib {det['confidence']:.2f}", (x1, y1 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.6, Config.COLOR_BIB, 2)
+
+                        # dibujar dígitos individuales
+                        for dd in digits_cam:
+                            dx, dy, dw, dh = dd['bbox']
+                            cls = names_svhn[dd['class_id']] if dd['class_id'] < len(names_svhn) else str(dd['class_id'])
+                            cv2.rectangle(frame, (dx, dy), (dx + dw, dy + dh), Config.COLOR_DIGIT, 2)
+                            cv2.putText(frame, f"{cls}", (dx, dy - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.7, Config.COLOR_DIGIT, 2)
 
                     # calcular FPS
                     elapsed = time.time() - t0
