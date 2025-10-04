@@ -41,15 +41,19 @@ class Config:
 
     # Parámetros para filtrado y aceptación de números
     # Confianza mínima por dígito (0..1) para considerarlo en el agrupamiento
-    CONF_SVHN_MIN_DIGIT = 0.6
+    CONF_SVHN_MIN_DIGIT = 0.80
     # Confianza promedio mínima del cluster aceptado
-    CONF_SVHN_AVG_MIN = 0.75
+    CONF_SVHN_AVG_MIN = 0.90
     # Proporción mínima del ancho del bib que debe cubrir el cluster de dígitos
-    MIN_DIGITS_WIDTH_RATIO = 0.12
+    MIN_DIGITS_WIDTH_RATIO = 0.30
     # Proporción mínima de solapamiento vertical entre cluster de dígitos y el bib
-    MIN_VERTICAL_OVERLAP_RATIO = 0.5
+    MIN_VERTICAL_OVERLAP_RATIO = 0.6
+    # Número mínimo de dígitos que debe tener el dorsal para ser considerado válido
+    MIN_DIGITS_COUNT = 3
+    # Número máximo de dígitos (para filtrar ruido)
+    MAX_DIGITS_COUNT = 4
     # Debounce: no registrar el mismo dorsal más de una vez en este número de segundos
-    DEBOUNCE_SECONDS = 10
+    DEBOUNCE_SECONDS = 15
 
     # Colores
     COLOR_BIB = (0, 255, 0)
@@ -242,7 +246,11 @@ def should_register(dorsal_str: str) -> bool:
                     best_cluster = {'cluster': cl, 'avg_conf': avg_conf, 'width_ratio': width_ratio}
 
             if best_cluster is not None:
-                if best_cluster['avg_conf'] >= Config.CONF_SVHN_AVG_MIN and best_cluster['width_ratio'] >= Config.MIN_DIGITS_WIDTH_RATIO:
+                # Validar cantidad de dígitos en el cluster
+                num_digits = len(best_cluster['cluster'])
+                if (best_cluster['avg_conf'] >= Config.CONF_SVHN_AVG_MIN and 
+                    best_cluster['width_ratio'] >= Config.MIN_DIGITS_WIDTH_RATIO and
+                    Config.MIN_DIGITS_COUNT <= num_digits <= Config.MAX_DIGITS_COUNT):
                     # comprobar solapamiento vertical entre cluster y bib
                     miny = min([c['bbox'][1] for c in best_cluster['cluster']])
                     maxy = max([c['bbox'][1] + c['bbox'][3] for c in best_cluster['cluster']])
@@ -485,7 +493,11 @@ def main():
                                     best_cluster = {'cluster': cl, 'avg_conf': avg_conf, 'width_ratio': width_ratio}
 
                             if best_cluster is not None:
-                                if best_cluster['avg_conf'] >= Config.CONF_SVHN_AVG_MIN and best_cluster['width_ratio'] >= Config.MIN_DIGITS_WIDTH_RATIO:
+                                # Validar cantidad de dígitos en el cluster
+                                num_digits_cam = len(best_cluster['cluster'])
+                                if (best_cluster['avg_conf'] >= Config.CONF_SVHN_AVG_MIN and 
+                                    best_cluster['width_ratio'] >= Config.MIN_DIGITS_WIDTH_RATIO and
+                                    Config.MIN_DIGITS_COUNT <= num_digits_cam <= Config.MAX_DIGITS_COUNT):
                                     # comprobar solapamiento vertical entre cluster y bib
                                     miny = min([c['bbox'][1] for c in best_cluster['cluster']])
                                     maxy = max([c['bbox'][1] + c['bbox'][3] for c in best_cluster['cluster']])
