@@ -39,6 +39,14 @@ class Config:
     CONF_SVHN = 0.25
     NMS_THRESHOLD = 0.4
 
+    # Parámetros para filtrado y aceptación de números
+    # Confianza mínima por dígito (0..1) para considerarlo en el agrupamiento
+    CONF_SVHN_MIN_DIGIT = 0.6
+    # Confianza promedio mínima del cluster aceptado
+    CONF_SVHN_AVG_MIN = 0.75
+    # Proporción mínima del ancho del bib que debe cubrir el cluster de dígitos
+    MIN_DIGITS_WIDTH_RATIO = 0.12
+
     # Colores
     COLOR_BIB = (0, 255, 0)
     COLOR_DIGIT = (0, 165, 255)
@@ -170,15 +178,57 @@ def process_image(image_path, net_bib, layers_bib, names_bib, net_svhn, layers_s
                 'class_id': d['class_id']
             })
 
-        # Ordenar dígitos por coordenada x y componer el número
+        # Filtrar dígitos por confianza individual
+        digits_filtered = [d for d in digits if d['confidence'] >= Config.CONF_SVHN_MIN_DIGIT]
+
         numero = ''
-        if len(digits) > 0:
-            digits_sorted = sorted(digits, key=lambda dd: dd['bbox'][0])
-            chars = []
-            for dd in digits_sorted:
-                cls = names_svhn[dd['class_id']] if dd['class_id'] < len(names_svhn) else str(dd['class_id'])
-                chars.append(cls)
-            numero = ''.join(chars)
+        accepted = False
+        if len(digits_filtered) > 0:
+            # calcular centro x para clustering
+            for d in digits_filtered:
+                bx, by, bw, bh = d['bbox']
+                d['center_x'] = bx + bw / 2
+
+            digits_sorted = sorted(digits_filtered, key=lambda dd: dd['center_x'])
+            widths = [d['bbox'][2] for d in digits_sorted]
+            mean_w = float(np.mean(widths)) if len(widths) > 0 else 0
+
+            # crear clusters simples por gap
+            clusters = []
+            current = [digits_sorted[0]]
+            for i in range(1, len(digits_sorted)):
+                gap = digits_sorted[i]['center_x'] - digits_sorted[i-1]['center_x']
+                if gap > max(mean_w * 1.5, mean_w + 10):
+                    clusters.append(current)
+                    current = [digits_sorted[i]]
+                else:
+                    current.append(digits_sorted[i])
+            clusters.append(current)
+
+            # evaluar clusters y escoger mejor
+            best_score = -1
+            best_cluster = None
+            bib_width = (x2 - x1) if (x2 - x1) > 0 else 1
+            for cl in clusters:
+                confidences = [c['confidence'] for c in cl]
+                avg_conf = float(np.mean(confidences))
+                minx = min([c['bbox'][0] for c in cl])
+                maxx = max([c['bbox'][0] + c['bbox'][2] for c in cl])
+                cluster_w = maxx - minx
+                width_ratio = cluster_w / bib_width
+                score = avg_conf * len(cl) * width_ratio
+                if score > best_score:
+                    best_score = score
+                    best_cluster = {'cluster': cl, 'avg_conf': avg_conf, 'width_ratio': width_ratio}
+
+            if best_cluster is not None:
+                if best_cluster['avg_conf'] >= Config.CONF_SVHN_AVG_MIN and best_cluster['width_ratio'] >= Config.MIN_DIGITS_WIDTH_RATIO:
+                    chars = []
+                    for dd in sorted(best_cluster['cluster'], key=lambda dd: dd['bbox'][0]):
+                        cls = names_svhn[dd['class_id']] if dd['class_id'] < len(names_svhn) else str(dd['class_id'])
+                        chars.append(cls)
+                    numero = ''.join(chars)
+                    accepted = True
 
         # Dibujar bbox del bib
         cv2.rectangle(img, (x1, y1), (x2, y2), Config.COLOR_BIB, 2)
@@ -367,21 +417,58 @@ def main():
                                 'class_id': d['class_id']
                             })
 
-                        # componer número ordenando por x
+                        # Filtrar por confianza y clusterizar como en el modo imagen
+                        digits_cam_filtered = [d for d in digits_cam if d['confidence'] >= Config.CONF_SVHN_MIN_DIGIT]
                         numero_cam = ''
-                        if len(digits_cam) > 0:
-                            digits_sorted_cam = sorted(digits_cam, key=lambda dd: dd['bbox'][0])
-                            chars_cam = []
-                            for dd in digits_sorted_cam:
-                                cls = names_svhn[dd['class_id']] if dd['class_id'] < len(names_svhn) else str(dd['class_id'])
-                                chars_cam.append(cls)
-                            numero_cam = ''.join(chars_cam)
+                        accepted_cam = False
+                        if len(digits_cam_filtered) > 0:
+                            for d in digits_cam_filtered:
+                                bx, by, bw, bh = d['bbox']
+                                d['center_x'] = bx + bw / 2
+                            digits_sorted_cam = sorted(digits_cam_filtered, key=lambda dd: dd['center_x'])
+                            widths_cam = [d['bbox'][2] for d in digits_sorted_cam]
+                            mean_w_cam = float(np.mean(widths_cam)) if len(widths_cam) > 0 else 0
+
+                            clusters_cam = []
+                            current_cam = [digits_sorted_cam[0]]
+                            for i in range(1, len(digits_sorted_cam)):
+                                gap = digits_sorted_cam[i]['center_x'] - digits_sorted_cam[i-1]['center_x']
+                                if gap > max(mean_w_cam * 1.5, mean_w_cam + 10):
+                                    clusters_cam.append(current_cam)
+                                    current_cam = [digits_sorted_cam[i]]
+                                else:
+                                    current_cam.append(digits_sorted_cam[i])
+                            clusters_cam.append(current_cam)
+
+                            best_score = -1
+                            best_cluster = None
+                            bib_width = (x2 - x1) if (x2 - x1) > 0 else 1
+                            for cl in clusters_cam:
+                                confidences = [c['confidence'] for c in cl]
+                                avg_conf = float(np.mean(confidences))
+                                minx = min([c['bbox'][0] for c in cl])
+                                maxx = max([c['bbox'][0] + c['bbox'][2] for c in cl])
+                                cluster_w = maxx - minx
+                                width_ratio = cluster_w / bib_width
+                                score = avg_conf * len(cl) * width_ratio
+                                if score > best_score:
+                                    best_score = score
+                                    best_cluster = {'cluster': cl, 'avg_conf': avg_conf, 'width_ratio': width_ratio}
+
+                            if best_cluster is not None:
+                                if best_cluster['avg_conf'] >= Config.CONF_SVHN_AVG_MIN and best_cluster['width_ratio'] >= Config.MIN_DIGITS_WIDTH_RATIO:
+                                    chars_cam = []
+                                    for dd in sorted(best_cluster['cluster'], key=lambda dd: dd['bbox'][0]):
+                                        cls = names_svhn[dd['class_id']] if dd['class_id'] < len(names_svhn) else str(dd['class_id'])
+                                        chars_cam.append(cls)
+                                    numero_cam = ''.join(chars_cam)
+                                    accepted_cam = True
 
                         # dibujar bib
                         cv2.rectangle(frame, (x1, y1), (x2, y2), Config.COLOR_BIB, 2)
-                        if numero_cam:
+                        if numero_cam and accepted_cam:
                             cv2.putText(frame, numero_cam, (x1, max(16, y1 - 20)), cv2.FONT_HERSHEY_SIMPLEX, 0.9, Config.COLOR_BIB, 3)
-                            # Registrar en Excel (modo cámara)
+                            # Registrar en Excel (modo cámara) solo si el número fue aceptado
                             try:
                                 out_excel = Path('registros_dorsales.xlsx')
                                 added = ensure_excel_and_append(numero_cam, out_excel)
