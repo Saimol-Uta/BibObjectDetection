@@ -242,22 +242,25 @@ def ensure_excel_and_append(dorsal, excel_path: Path):
         df = pd.DataFrame(columns=columnas)
 
     # Comprobar duplicado por dorsal (comparar como str para normalizar)
-    dorsal_str = str(dorsal)
-    if 'Dorsal' in df.columns and dorsal_str in df['Dorsal'].astype(str).values:
+    dorsal_str = str(dorsal).strip()
+    if 'Dorsal' in df.columns and dorsal_str in df['Dorsal'].astype(str).str.strip().values:
         return None
 
     # Determinar posición
-    if len(df) == 0:
-        posicion = 1
-    else:
-        # si la columna Posición existe y tiene enteros, tomar max+1
-        if 'Posición' in df.columns and pd.api.types.is_numeric_dtype(df['Posición']):
-            posicion = int(df['Posición'].max()) + 1
-        else:
+    if 'Posición' in df.columns and pd.api.types.is_numeric_dtype(df['Posición']):
+        try:
+            maxpos = int(pd.to_numeric(df['Posición'], errors='coerce').max())
+            posicion = maxpos + 1 if not np.isnan(maxpos) else 1
+        except Exception:
             posicion = len(df) + 1
+    else:
+        posicion = len(df) + 1
 
     nueva = {'Posición': posicion, 'Dorsal': dorsal_str, 'HoraLlegada': now}
-    df = df.append(nueva, ignore_index=True)
+
+    # Añadir la fila usando pd.concat para compatibilidad con pandas 2.x
+    new_row_df = pd.DataFrame([nueva])
+    df = pd.concat([df, new_row_df], ignore_index=True)
 
     # Guardar
     df.to_excel(excel_path, index=False)
