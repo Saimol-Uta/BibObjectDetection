@@ -17,6 +17,7 @@ from pathlib import Path
 import argparse
 import time
 from datetime import datetime
+import pandas as pd
 
 
 class Config:
@@ -195,6 +196,15 @@ def process_image(image_path, net_bib, layers_bib, names_bib, net_svhn, layers_s
             cv2.putText(img, f"{cls}", (dx, dy - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.7, Config.COLOR_DIGIT, 2)
 
         results.append({'bib_bbox': [x1, y1, x2 - x1, y2 - y1], 'digits': digits, 'number': numero})
+        # Registrar en Excel si hay número
+        if numero:
+            try:
+                out_excel = Path('registros_dorsales.xlsx')
+                added_row = ensure_excel_and_append(numero, out_excel)
+                if added_row is not None:
+                    print(f"[REGISTRO] Añadida fila: {added_row}")
+            except Exception as e:
+                print(f"[X] Error registrando en Excel: {e}")
 
     # Guardar resultado
     output_dir = Path("output")
@@ -210,6 +220,48 @@ def process_image(image_path, net_bib, layers_bib, names_bib, net_svhn, layers_s
         cv2.destroyAllWindows()
 
     return str(out_path), results
+
+
+def ensure_excel_and_append(dorsal, excel_path: Path):
+    """Asegura que el archivo Excel existe y añade una fila con Posición, Dorsal, HoraLlegada.
+    Si el dorsal ya está registrado, no lo duplica y devuelve None.
+    Devuelve la fila añadida como dict si se añadió.
+    """
+    excel_path = Path(excel_path)
+    columnas = ['Posición', 'Dorsal', 'HoraLlegada']
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    if excel_path.exists():
+        # leer existing
+        try:
+            df = pd.read_excel(excel_path)
+        except Exception:
+            # si hay problema leyendo, crear nuevo
+            df = pd.DataFrame(columns=columnas)
+    else:
+        df = pd.DataFrame(columns=columnas)
+
+    # Comprobar duplicado por dorsal (comparar como str para normalizar)
+    dorsal_str = str(dorsal)
+    if 'Dorsal' in df.columns and dorsal_str in df['Dorsal'].astype(str).values:
+        return None
+
+    # Determinar posición
+    if len(df) == 0:
+        posicion = 1
+    else:
+        # si la columna Posición existe y tiene enteros, tomar max+1
+        if 'Posición' in df.columns and pd.api.types.is_numeric_dtype(df['Posición']):
+            posicion = int(df['Posición'].max()) + 1
+        else:
+            posicion = len(df) + 1
+
+    nueva = {'Posición': posicion, 'Dorsal': dorsal_str, 'HoraLlegada': now}
+    df = df.append(nueva, ignore_index=True)
+
+    # Guardar
+    df.to_excel(excel_path, index=False)
+    return nueva
 
 
 def main():
@@ -326,6 +378,14 @@ def main():
                         cv2.rectangle(frame, (x1, y1), (x2, y2), Config.COLOR_BIB, 2)
                         if numero_cam:
                             cv2.putText(frame, numero_cam, (x1, max(16, y1 - 20)), cv2.FONT_HERSHEY_SIMPLEX, 0.9, Config.COLOR_BIB, 3)
+                            # Registrar en Excel (modo cámara)
+                            try:
+                                out_excel = Path('registros_dorsales.xlsx')
+                                added = ensure_excel_and_append(numero_cam, out_excel)
+                                if added is not None:
+                                    print(f"[REGISTRO] Añadida fila: {added}")
+                            except Exception as e:
+                                print(f"[X] Error registrando en Excel (camara): {e}")
                         else:
                             cv2.putText(frame, f"bib {det['confidence']:.2f}", (x1, y1 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.6, Config.COLOR_BIB, 2)
 
