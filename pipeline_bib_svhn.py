@@ -46,6 +46,10 @@ class Config:
     CONF_SVHN_AVG_MIN = 0.75
     # Proporción mínima del ancho del bib que debe cubrir el cluster de dígitos
     MIN_DIGITS_WIDTH_RATIO = 0.12
+    # Proporción mínima de solapamiento vertical entre cluster de dígitos y el bib
+    MIN_VERTICAL_OVERLAP_RATIO = 0.5
+    # Debounce: no registrar el mismo dorsal más de una vez en este número de segundos
+    DEBOUNCE_SECONDS = 10
 
     # Colores
     COLOR_BIB = (0, 255, 0)
@@ -143,6 +147,22 @@ def process_image(image_path, net_bib, layers_bib, names_bib, net_svhn, layers_s
 
     results = []
 
+# Cache de registros recientes para debounce: dorsal_str -> timestamp (seconds)
+recent_registrations = {}
+
+
+def should_register(dorsal_str: str) -> bool:
+    """Devuelve True si el dorsal puede registrarse (no se registró en los últimos DEBOUNCE_SECONDS)."""
+    now_ts = time.time()
+    last = recent_registrations.get(dorsal_str)
+    if last is None:
+        recent_registrations[dorsal_str] = now_ts
+        return True
+    if now_ts - last >= Config.DEBOUNCE_SECONDS:
+        recent_registrations[dorsal_str] = now_ts
+        return True
+    return False
+
     for det in detections_bib:
         x, y, w, h = det['bbox']
         # ajustar límites
@@ -223,12 +243,19 @@ def process_image(image_path, net_bib, layers_bib, names_bib, net_svhn, layers_s
 
             if best_cluster is not None:
                 if best_cluster['avg_conf'] >= Config.CONF_SVHN_AVG_MIN and best_cluster['width_ratio'] >= Config.MIN_DIGITS_WIDTH_RATIO:
-                    chars = []
-                    for dd in sorted(best_cluster['cluster'], key=lambda dd: dd['bbox'][0]):
-                        cls = names_svhn[dd['class_id']] if dd['class_id'] < len(names_svhn) else str(dd['class_id'])
-                        chars.append(cls)
-                    numero = ''.join(chars)
-                    accepted = True
+                    # comprobar solapamiento vertical entre cluster y bib
+                    miny = min([c['bbox'][1] for c in best_cluster['cluster']])
+                    maxy = max([c['bbox'][1] + c['bbox'][3] for c in best_cluster['cluster']])
+                    cluster_h = maxy - miny
+                    bib_h = y2 - y1 if (y2 - y1) > 0 else 1
+                    vert_overlap = cluster_h / bib_h
+                    if vert_overlap >= Config.MIN_VERTICAL_OVERLAP_RATIO:
+                        chars = []
+                        for dd in sorted(best_cluster['cluster'], key=lambda dd: dd['bbox'][0]):
+                            cls = names_svhn[dd['class_id']] if dd['class_id'] < len(names_svhn) else str(dd['class_id'])
+                            chars.append(cls)
+                        numero = ''.join(chars)
+                        accepted = True
 
         # Dibujar bbox del bib
         cv2.rectangle(img, (x1, y1), (x2, y2), Config.COLOR_BIB, 2)
@@ -245,16 +272,18 @@ def process_image(image_path, net_bib, layers_bib, names_bib, net_svhn, layers_s
             cv2.rectangle(img, (dx, dy), (dx + dw, dy + dh), Config.COLOR_DIGIT, 2)
             cv2.putText(img, f"{cls}", (dx, dy - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.7, Config.COLOR_DIGIT, 2)
 
-        results.append({'bib_bbox': [x1, y1, x2 - x1, y2 - y1], 'digits': digits, 'number': numero})
-        # Registrar en Excel si hay número
-        if numero:
-            try:
-                out_excel = Path('registros_dorsales.xlsx')
-                added_row = ensure_excel_and_append(numero, out_excel)
-                if added_row is not None:
-                    print(f"[REGISTRO] Añadida fila: {added_row}")
-            except Exception as e:
-                print(f"[X] Error registrando en Excel: {e}")
+        results.append({'bib_bbox': [x1, y1, x2 - x1, y2 - y1], 'digits': digits, 'number': numero if accepted else ''})
+        # Registrar en Excel si hay número aceptado y pasa debounce
+        if numero and accepted:
+            dorsal_str = str(numero).strip()
+            if should_register(dorsal_str):
+                try:
+                    out_excel = Path('registros_dorsales.xlsx')
+                    added_row = ensure_excel_and_append(dorsal_str, out_excel)
+                    if added_row is not None:
+                        print(f"[REGISTRO] Añadida fila: {added_row}")
+                except Exception as e:
+                    print(f"[X] Error registrando en Excel: {e}")
 
     # Guardar resultado
     output_dir = Path("output")
@@ -457,25 +486,34 @@ def main():
 
                             if best_cluster is not None:
                                 if best_cluster['avg_conf'] >= Config.CONF_SVHN_AVG_MIN and best_cluster['width_ratio'] >= Config.MIN_DIGITS_WIDTH_RATIO:
-                                    chars_cam = []
-                                    for dd in sorted(best_cluster['cluster'], key=lambda dd: dd['bbox'][0]):
-                                        cls = names_svhn[dd['class_id']] if dd['class_id'] < len(names_svhn) else str(dd['class_id'])
-                                        chars_cam.append(cls)
-                                    numero_cam = ''.join(chars_cam)
-                                    accepted_cam = True
+                                    # comprobar solapamiento vertical entre cluster y bib
+                                    miny = min([c['bbox'][1] for c in best_cluster['cluster']])
+                                    maxy = max([c['bbox'][1] + c['bbox'][3] for c in best_cluster['cluster']])
+                                    cluster_h = maxy - miny
+                                    bib_h = y2 - y1 if (y2 - y1) > 0 else 1
+                                    vert_overlap = cluster_h / bib_h
+                                    if vert_overlap >= Config.MIN_VERTICAL_OVERLAP_RATIO:
+                                        chars_cam = []
+                                        for dd in sorted(best_cluster['cluster'], key=lambda dd: dd['bbox'][0]):
+                                            cls = names_svhn[dd['class_id']] if dd['class_id'] < len(names_svhn) else str(dd['class_id'])
+                                            chars_cam.append(cls)
+                                        numero_cam = ''.join(chars_cam)
+                                        accepted_cam = True
 
                         # dibujar bib
                         cv2.rectangle(frame, (x1, y1), (x2, y2), Config.COLOR_BIB, 2)
                         if numero_cam and accepted_cam:
                             cv2.putText(frame, numero_cam, (x1, max(16, y1 - 20)), cv2.FONT_HERSHEY_SIMPLEX, 0.9, Config.COLOR_BIB, 3)
-                            # Registrar en Excel (modo cámara) solo si el número fue aceptado
-                            try:
-                                out_excel = Path('registros_dorsales.xlsx')
-                                added = ensure_excel_and_append(numero_cam, out_excel)
-                                if added is not None:
-                                    print(f"[REGISTRO] Añadida fila: {added}")
-                            except Exception as e:
-                                print(f"[X] Error registrando en Excel (camara): {e}")
+                            # Registrar en Excel (modo cámara) solo si el número fue aceptado y pasa debounce
+                            dorsal_str = str(numero_cam).strip()
+                            if should_register(dorsal_str):
+                                try:
+                                    out_excel = Path('registros_dorsales.xlsx')
+                                    added = ensure_excel_and_append(dorsal_str, out_excel)
+                                    if added is not None:
+                                        print(f"[REGISTRO] Añadida fila: {added}")
+                                except Exception as e:
+                                    print(f"[X] Error registrando en Excel (camara): {e}")
                         else:
                             cv2.putText(frame, f"bib {det['confidence']:.2f}", (x1, y1 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.6, Config.COLOR_BIB, 2)
 
