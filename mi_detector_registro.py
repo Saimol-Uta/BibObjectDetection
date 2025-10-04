@@ -13,6 +13,34 @@ import argparse
 import time
 from datetime import datetime
 
+# Detectar si la build de OpenCV tiene soporte GUI (cv2.imshow)
+def _check_opencv_gui():
+    """Intenta crear una ventana y mostrar un pequeño frame para comprobar soporte GUI.
+    Devuelve True si cv2.imshow funciona sin lanzar la excepción de "not implemented".
+    """
+    try:
+        # Crear una pequeña ventana de prueba
+        cv2.namedWindow("__cv2_gui_test__")
+        test_img = np.zeros((10, 10, 3), dtype=np.uint8)
+        cv2.imshow("__cv2_gui_test__", test_img)
+        # waitKey breve para que la ventana se procese
+        cv2.waitKey(1)
+        cv2.destroyWindow("__cv2_gui_test__")
+        return True
+    except Exception:
+        return False
+
+# Comprobar una sola vez al importar
+GUI_AVAILABLE = _check_opencv_gui()
+
+if not GUI_AVAILABLE:
+    print("[!] Atención: la build de OpenCV no tiene soporte GUI (cv2.imshow).")
+    print("    -> Para corregirlo en Windows reinstala el paquete correcto: ")
+    print("       pip uninstall opencv-python-headless opencv-python opencv-contrib-python -y ;")
+    print("       pip install opencv-contrib-python")
+    print("    O usa conda: conda install -c conda-forge opencv")
+    print("    Mientras tanto, el detector funcionará en modo 'headless' (guardando frames en 'output/')")
+
 # Importar sistema de registro
 from registro_llegadas import RegistroLlegadas
 
@@ -317,6 +345,10 @@ def detectar_camara(detector):
     print("NOTA: Los dorsales se registran automáticamente al ser detectados")
     print("      Verde = no registrado | Naranja = ya registrado\n")
     
+    # Para modo headless guardamos un preview cada N segundos
+    last_preview_save = 0.0
+    PREVIEW_INTERVAL = 5.0  # segundos
+
     while True:
         if not pausado:
             ret, frame = cap.read()
@@ -360,42 +392,57 @@ def detectar_camara(detector):
                 f"Frames: {frames_procesados}"
             ]
             
-            y_pos = 30
-            for texto in info_texto:
-                # Fondo del texto
-                (tw, th), _ = cv2.getTextSize(texto, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
-                cv2.rectangle(frame, (5, y_pos - 25), (tw + 15, y_pos + 5), (0, 0, 0), -1)
-                
-                # Texto
-                cv2.putText(
-                    frame, 
-                    texto, 
-                    (10, y_pos), 
-                    cv2.FONT_HERSHEY_SIMPLEX, 
-                    0.7, 
-                    (0, 255, 0), 
-                    2
-                )
-                y_pos += 35
-        
-        # Mostrar frame
-        cv2.imshow('Detector con Registro de Llegadas', frame)
-        
-        # Manejar teclas
-        key = cv2.waitKey(1) & 0xFF
-        
-        if key == ord('q') or key == 27:  # 'q' o ESC
-            break
-        elif key == ord('c'):  # Capturar
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = output_dir / f"captura_{timestamp}.jpg"
-            cv2.imwrite(str(filename), frame)
-            print(f"[✓] Frame capturado: {filename}")
-        elif key == ord('s'):  # Estadísticas
-            print("\n" + "="*70)
-            if detector.registro:
-                stats = detector.registro.obtener_estadisticas()
-                if stats:
+            # Mostrar frame o fallback headless
+            if GUI_AVAILABLE:
+                cv2.imshow('Detector con Registro de Llegadas', frame)
+                # Manejar teclas
+                key = cv2.waitKey(1) & 0xFF
+
+                if key == ord('q') or key == 27:  # 'q' o ESC
+                    break
+                elif key == ord('c'):  # Capturar
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    filename = output_dir / f"captura_{timestamp}.jpg"
+                    cv2.imwrite(str(filename), frame)
+                    print(f"[\u2713] Frame capturado: {filename}")
+                elif key == ord('s'):  # Estadísticas
+                    print("\n" + "="*70)
+                    if detector.registro:
+                        stats = detector.registro.obtener_estadisticas()
+                        if stats:
+                            print(f"Total llegadas registradas: {stats['total_llegadas']}")
+                            if stats['total_llegadas'] > 0:
+                                print(f"Primer lugar: Dorsal {stats['primer_dorsal']} - {stats['primera_hora']}")
+                                print(f"Último: Dorsal {stats['ultimo_dorsal']} - {stats['ultima_hora']}")
+                    print("="*70 + "\n")
+                elif key == ord('r'):  # Registro manual
+                    print("\n[REGISTRO MANUAL]")
+                    print("Dorsales detectados en pantalla:")
+                    if detecciones:
+                        for i, det in enumerate(detecciones, 1):
+                            print(f"  {i}. Dorsal: {det['class_name']}")
+                    else:
+                        print("  No hay detecciones visibles")
+                    print()
+                elif key == ord(' '):  # ESPACIO
+                    pausado = not pausado
+                    estado = "PAUSADO" if pausado else "REANUDADO"
+                    print(f"[*] {estado}")
+            else:
+                # Headless: no podemos capturar teclas con waitKey; permitimos salir con Ctrl+C
+                # Guardar un preview cada PREVIEW_INTERVAL segundos para inspección
+                now = time.time()
+                if now - last_preview_save > PREVIEW_INTERVAL:
+                    preview_path = output_dir / "headless_preview.jpg"
+                    cv2.imwrite(str(preview_path), frame)
+                    print(f"[headless] Preview guardado: {preview_path}")
+                    last_preview_save = now
+                # Pequeña pausa para no consumir 100% CPU
+                try:
+                    time.sleep(0.02)
+                except KeyboardInterrupt:
+                    print("\n[*] Detenido por usuario (headless)")
+                    break
                     print(f"Total llegadas registradas: {stats['total_llegadas']}")
                     if stats['total_llegadas'] > 0:
                         print(f"Primer lugar: Dorsal {stats['primer_dorsal']} - {stats['primera_hora']}")
@@ -480,11 +527,14 @@ def detectar_imagen(detector, ruta_imagen):
     print(f"[✓] Tiempo de procesamiento: {elapsed:.3f}s")
     print(f"[✓] Resultado guardado: {output_path}")
     
-    # Mostrar
-    cv2.imshow('Deteccion con Registro', frame)
-    print("\nPresiona cualquier tecla para cerrar...")
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    # Mostrar (si hay soporte GUI) o informar ruta de salida
+    if GUI_AVAILABLE:
+        cv2.imshow('Deteccion con Registro', frame)
+        print("\nPresiona cualquier tecla para cerrar...")
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+    else:
+        print(f"[headless] Resultado guardado en: {output_path} (sin visualización en pantalla)")
 
 
 def main():

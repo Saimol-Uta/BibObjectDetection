@@ -1,0 +1,331 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Pipeline: detectar bib (RBNR) -> recortar ROI -> detectar dígitos (SVHN)
+
+Uso rápido:
+  python pipeline_bib_svhn.py --modo imagen --archivo path\to\imagen.jpg
+
+Este script carga dos modelos YOLOv4-tiny usando OpenCV DNN (CPU) y aplica
+primero la detección de la caja del dorsal ('bib') y luego detecta dígitos
+en la región recortada usando el detector SVHN disponible en `weights-classes`.
+"""
+
+import cv2
+import numpy as np
+from pathlib import Path
+import argparse
+import time
+from datetime import datetime
+
+
+class Config:
+    # Modelos
+    RBNR_CFG = "weights-classes/RBNR_custom-yolov4-tiny-detector.cfg"
+    RBNR_WEIGHTS = "weights-classes/RBNR_custom-yolov4-tiny-detector_best.weights"
+    RBNR_NAMES = "weights-classes/RBRN_obj.names"
+
+    SVHN_CFG = "weights-classes/SVHN_custom-yolov4-tiny-detector.cfg"
+    SVHN_WEIGHTS = "weights-classes/SVHN_custom-yolov4-tiny-detector_best.weights"
+    SVHN_NAMES = "weights-classes/SVHN_obj.names"
+
+    # Tamaños de entrada
+    INPUT_SIZE_RBNR = 416
+    INPUT_SIZE_SVHN = 416
+
+    # Umbrales por defecto
+    CONF_RBNR = 0.3
+    CONF_SVHN = 0.25
+    NMS_THRESHOLD = 0.4
+
+    # Colores
+    COLOR_BIB = (0, 255, 0)
+    COLOR_DIGIT = (0, 165, 255)
+
+
+def _load_net(cfg_path, weights_path):
+    cfg = Path(cfg_path)
+    weights = Path(weights_path)
+    if not cfg.exists():
+        raise FileNotFoundError(f"CFG no encontrado: {cfg}")
+    if not weights.exists():
+        raise FileNotFoundError(f"Weights no encontrado: {weights}")
+
+    net = cv2.dnn.readNetFromDarknet(str(cfg), str(weights))
+    net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
+    net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
+
+    layer_names = net.getLayerNames()
+    unconnected = net.getUnconnectedOutLayers()
+    # Compatibilidad con diferentes formatos
+    if isinstance(unconnected, np.ndarray):
+        if len(unconnected.shape) == 1:
+            output_layers = [layer_names[i - 1] for i in unconnected]
+        else:
+            output_layers = [layer_names[i[0] - 1] for i in unconnected]
+    else:
+        output_layers = [layer_names[i - 1] for i in unconnected]
+
+    return net, output_layers
+
+
+def _load_names(names_path):
+    p = Path(names_path)
+    if not p.exists():
+        raise FileNotFoundError(f"Names no encontrado: {p}")
+    with open(p, 'r', encoding='utf-8') as f:
+        return [line.strip() for line in f.readlines() if line.strip()]
+
+
+def detect_with_net(net, output_layers, frame, input_size, conf_threshold):
+    h, w = frame.shape[:2]
+    blob = cv2.dnn.blobFromImage(frame, 1/255.0, (input_size, input_size), swapRB=True, crop=False)
+    net.setInput(blob)
+    outputs = net.forward(output_layers)
+
+    boxes = []
+    confidences = []
+    class_ids = []
+
+    for output in outputs:
+        for detection in output:
+            objectness = float(detection[4])
+            scores = detection[5:]
+            if len(scores) == 0:
+                continue
+            class_id = int(np.argmax(scores))
+            class_score = float(scores[class_id])
+            confidence = objectness * class_score
+
+            if confidence > conf_threshold:
+                center_x = int(detection[0] * w)
+                center_y = int(detection[1] * h)
+                bw = int(detection[2] * w)
+                bh = int(detection[3] * h)
+                x = int(center_x - bw / 2)
+                y = int(center_y - bh / 2)
+                boxes.append([x, y, bw, bh])
+                confidences.append(float(confidence))
+                class_ids.append(class_id)
+
+    indices = cv2.dnn.NMSBoxes(boxes, confidences, conf_threshold, Config.NMS_THRESHOLD)
+    detections = []
+    if len(indices) > 0:
+        for i in indices.flatten():
+            detections.append({
+                'bbox': boxes[i],
+                'confidence': confidences[i],
+                'class_id': class_ids[i]
+            })
+    return detections
+
+
+def clamp(x, a, b):
+    return max(a, min(b, x))
+
+
+def process_image(image_path, net_bib, layers_bib, names_bib, net_svhn, layers_svhn, names_svhn, conf_bib, conf_svhn, show_window=True):
+    img = cv2.imread(str(image_path))
+    if img is None:
+        raise FileNotFoundError(f"No se pudo leer la imagen: {image_path}")
+
+    orig = img.copy()
+    detections_bib = detect_with_net(net_bib, layers_bib, img, Config.INPUT_SIZE_RBNR, conf_bib)
+
+    results = []
+
+    for det in detections_bib:
+        x, y, w, h = det['bbox']
+        # ajustar límites
+        x1 = clamp(x, 0, img.shape[1] - 1)
+        y1 = clamp(y, 0, img.shape[0] - 1)
+        x2 = clamp(x + w, 0, img.shape[1] - 1)
+        y2 = clamp(y + h, 0, img.shape[0] - 1)
+
+        # añadir pequeño padding
+        pad_x = int(0.04 * (x2 - x1))
+        pad_y = int(0.05 * (y2 - y1))
+        x1p = clamp(x1 - pad_x, 0, img.shape[1] - 1)
+        y1p = clamp(y1 - pad_y, 0, img.shape[0] - 1)
+        x2p = clamp(x2 + pad_x, 0, img.shape[1] - 1)
+        y2p = clamp(y2 + pad_y, 0, img.shape[0] - 1)
+
+        roi = orig[y1p:y2p, x1p:x2p]
+        if roi.size == 0:
+            continue
+
+        # Detectar dígitos en la ROI con el detector SVHN
+        det_digits = detect_with_net(net_svhn, layers_svhn, roi, Config.INPUT_SIZE_SVHN, conf_svhn)
+
+        digits = []
+        for d in det_digits:
+            dx, dy, dw, dh = d['bbox']
+            # convertir coordenadas a las de la imagen original
+            abs_x = x1p + dx
+            abs_y = y1p + dy
+            digits.append({
+                'bbox': [abs_x, abs_y, dw, dh],
+                'confidence': d['confidence'],
+                'class_id': d['class_id']
+            })
+
+        # Dibujar bbox del bib
+        cv2.rectangle(img, (x1, y1), (x2, y2), Config.COLOR_BIB, 2)
+        cv2.putText(img, f"bib {det['confidence']:.2f}", (x1, y1 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.6, Config.COLOR_BIB, 2)
+
+        # Dibujar dígitos detectados
+        for dd in digits:
+            dx, dy, dw, dh = dd['bbox']
+            # obtener clase nombre
+            cls = names_svhn[dd['class_id']] if dd['class_id'] < len(names_svhn) else str(dd['class_id'])
+            cv2.rectangle(img, (dx, dy), (dx + dw, dy + dh), Config.COLOR_DIGIT, 2)
+            cv2.putText(img, f"{cls} {dd['confidence']:.2f}", (dx, dy - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.6, Config.COLOR_DIGIT, 2)
+
+        results.append({'bib_bbox': [x1, y1, x2 - x1, y2 - y1], 'digits': digits})
+
+    # Guardar resultado
+    output_dir = Path("output")
+    output_dir.mkdir(exist_ok=True)
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    out_path = output_dir / f"pipeline_result_{timestamp}.jpg"
+    cv2.imwrite(str(out_path), img)
+
+    if show_window:
+        cv2.imshow('Bib + SVHN detections', img)
+        print('\nPresiona cualquier tecla para cerrar...')
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+    return str(out_path), results
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Pipeline: bib -> SVHN digits')
+    parser.add_argument('--modo', choices=['imagen', 'camara'], default='imagen')
+    parser.add_argument('--archivo', type=str, help='Ruta de imagen para modo imagen')
+    parser.add_argument('--conf', type=float, default=None, help='Umbral/confianza para detección de bib (objectness*class_score)')
+    parser.add_argument('--conf_svhn', type=float, default=None, help='Umbral/confianza para detección SVHN')
+    parser.add_argument('--no-show', dest='show', action='store_false', help='No mostrar ventana interactiva')
+
+    args = parser.parse_args()
+
+    # Cargar modelos
+    print('Cargando modelos...')
+    net_bib, layers_bib = _load_net(Config.RBNR_CFG, Config.RBNR_WEIGHTS)
+    names_bib = _load_names(Config.RBNR_NAMES)
+
+    net_svhn, layers_svhn = _load_net(Config.SVHN_CFG, Config.SVHN_WEIGHTS)
+    names_svhn = _load_names(Config.SVHN_NAMES)
+
+    conf_bib = Config.CONF_RBNR if args.conf is None else float(args.conf)
+    conf_svhn = Config.CONF_SVHN if args.conf_svhn is None else float(args.conf_svhn)
+
+    if args.modo == 'imagen':
+        if not args.archivo:
+            print('[X] Modo imagen requiere --archivo')
+            return
+        image_path = Path(args.archivo)
+        if not image_path.exists():
+            print(f'[X] Imagen no encontrada: {image_path}')
+            return
+
+        print(f'Procesando imagen: {image_path}')
+        out_path, results = process_image(image_path, net_bib, layers_bib, names_bib, net_svhn, layers_svhn, names_svhn, conf_bib, conf_svhn, args.show)
+        print(f'Resultado guardado: {out_path}')
+        print(f'Detecciones: {len(results)} bibs')
+        for i, r in enumerate(results, 1):
+            print(f' Bib {i}: {len(r["digits"])} dígitos')
+
+    else:
+        # Modo cámara: capturar frames y procesar en tiempo real
+        print('Iniciando modo cámara. Presiona q o ESC para salir, c para capturar, espacio para pausar/reanudar.')
+        cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            print('[X] No se pudo abrir la cámara')
+            return
+
+        # configurar resolución si se desea
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+
+        pausado = False
+        output_dir = Path('output')
+        output_dir.mkdir(exist_ok=True)
+
+        fps_buffer = []
+
+        try:
+            while True:
+                if not pausado:
+                    t0 = time.time()
+                    ret, frame = cap.read()
+                    if not ret:
+                        print('[X] Error al leer frame de la cámara')
+                        break
+
+                    # detectar bibs en el frame
+                    detections_bib = detect_with_net(net_bib, layers_bib, frame, Config.INPUT_SIZE_RBNR, conf_bib)
+
+                    # para cada bib, recortar y detectar dígitos
+                    for det in detections_bib:
+                        x, y, w, h = det['bbox']
+                        x1 = clamp(x, 0, frame.shape[1] - 1)
+                        y1 = clamp(y, 0, frame.shape[0] - 1)
+                        x2 = clamp(x + w, 0, frame.shape[1] - 1)
+                        y2 = clamp(y + h, 0, frame.shape[0] - 1)
+
+                        pad_x = int(0.04 * (x2 - x1))
+                        pad_y = int(0.05 * (y2 - y1))
+                        x1p = clamp(x1 - pad_x, 0, frame.shape[1] - 1)
+                        y1p = clamp(y1 - pad_y, 0, frame.shape[0] - 1)
+                        x2p = clamp(x2 + pad_x, 0, frame.shape[1] - 1)
+                        y2p = clamp(y2 + pad_y, 0, frame.shape[0] - 1)
+
+                        roi = frame[y1p:y2p, x1p:x2p]
+                        if roi.size == 0:
+                            continue
+
+                        det_digits = detect_with_net(net_svhn, layers_svhn, roi, Config.INPUT_SIZE_SVHN, conf_svhn)
+
+                        # dibujar bib
+                        cv2.rectangle(frame, (x1, y1), (x2, y2), Config.COLOR_BIB, 2)
+                        cv2.putText(frame, f"bib {det['confidence']:.2f}", (x1, y1 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.6, Config.COLOR_BIB, 2)
+
+                        for d in det_digits:
+                            dx, dy, dw, dh = d['bbox']
+                            abs_x = x1p + dx
+                            abs_y = y1p + dy
+                            cls = names_svhn[d['class_id']] if d['class_id'] < len(names_svhn) else str(d['class_id'])
+                            cv2.rectangle(frame, (abs_x, abs_y), (abs_x + dw, abs_y + dh), Config.COLOR_DIGIT, 2)
+                            cv2.putText(frame, f"{cls} {d['confidence']:.2f}", (abs_x, abs_y - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.6, Config.COLOR_DIGIT, 2)
+
+                    # calcular FPS
+                    elapsed = time.time() - t0
+                    fps = 1 / elapsed if elapsed > 0 else 0
+                    fps_buffer.append(fps)
+                    if len(fps_buffer) > 30:
+                        fps_buffer.pop(0)
+                    fps_avg = sum(fps_buffer) / len(fps_buffer)
+
+                    cv2.putText(frame, f"FPS: {fps_avg:.1f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+
+                cv2.imshow('Bib + SVHN (camara)', frame)
+                key = cv2.waitKey(1) & 0xFF
+                if key == ord('q') or key == 27:
+                    break
+                elif key == ord('c'):
+                    ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+                    fname = output_dir / f'captura_{ts}.jpg'
+                    cv2.imwrite(str(fname), frame)
+                    print(f'[✓] Captura guardada: {fname}')
+                elif key == ord(' '):
+                    pausado = not pausado
+                    print('[*] PAUSADO' if pausado else '[*] REANUDADO')
+
+        finally:
+            cap.release()
+            cv2.destroyAllWindows()
+
+
+if __name__ == '__main__':
+    main()

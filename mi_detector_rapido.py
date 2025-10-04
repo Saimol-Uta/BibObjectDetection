@@ -21,7 +21,7 @@ class Config:
     MODELO_RBNR_NAMES = "weights-classes/RBRN_obj.names"
     
     # Parametros de deteccion
-    CONFIANZA_MIN = 0.5
+    CONFIANZA_MIN = 0.3
     NMS_THRESHOLD = 0.4
     INPUT_SIZE = 416
     
@@ -123,19 +123,26 @@ class DetectorOptimizado:
         
         for output in outputs:
             for detection in output:
+                # detection: [center_x, center_y, w, h, objectness, class_scores...]
+                objectness = float(detection[4])
                 scores = detection[5:]
-                class_id = np.argmax(scores)
-                confidence = scores[class_id]
-                
+                if len(scores) == 0:
+                    continue
+                class_id = int(np.argmax(scores))
+                class_score = float(scores[class_id])
+
+                # Usar product of objectness * class_score como confianza final
+                confidence = objectness * class_score
+
                 if confidence > Config.CONFIANZA_MIN:
                     center_x = int(detection[0] * width)
                     center_y = int(detection[1] * height)
                     w = int(detection[2] * width)
                     h = int(detection[3] * height)
-                    
+
                     x = int(center_x - w / 2)
                     y = int(center_y - h / 2)
-                    
+
                     boxes.append([x, y, w, h])
                     confidences.append(float(confidence))
                     class_ids.append(class_id)
@@ -374,12 +381,18 @@ def main():
     parser.add_argument('--modo', choices=['camara', 'imagen'], default='camara',
                        help='Modo de deteccion')
     parser.add_argument('--archivo', type=str, help='Ruta de imagen (para modo imagen)')
+    parser.add_argument('--conf', type=float, default=None,
+                       help='Umbral de confianza final (objectness * class_score). Por defecto: 0.3')
     
     args = parser.parse_args()
     
     try:
         # Crear detector
         detector = DetectorOptimizado()
+
+        # Si se pasó --conf, actualizar el umbral de confianza
+        if args.conf is not None:
+            Config.CONFIANZA_MIN = float(args.conf)
         
         # Ejecutar modo
         if args.modo == 'camara':
